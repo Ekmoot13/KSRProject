@@ -41,97 +41,125 @@ namespace BackendApp
         {
             var factory = new ConnectionFactory() { HostName = Environment.GetEnvironmentVariable("RABBITMQ_HOST") ?? "localhost" };
 
-
-            using (var connection = factory.CreateConnection())
-            using (var channel = connection.CreateModel())
+            try
             {
-                // Deklaracja kolejki komend
-                channel.QueueDeclare(queue: "commandQueue",
-                                     durable: false,
-                                     exclusive: false,
-                                     autoDelete: false,
-                                     arguments: null);
-
-                // Deklaracja kolejki odpowiedzi
-                channel.QueueDeclare(queue: "responseQueue",
-                                     durable: false,
-                                     exclusive: false,
-                                     autoDelete: false,
-                                     arguments: null);
-
-                var consumer = new EventingBasicConsumer(channel);
-                consumer.Received += (model, ea) =>
+                // Próba nawiązania połączenia z RabbitMQ
+                using (var connection = factory.CreateConnection())
+                using (var channel = connection.CreateModel())
                 {
-                    var body = ea.Body.ToArray();
-                    var message = Encoding.UTF8.GetString(body);
+                    // Fail-fast: Jeśli połączenie się nie uda, natychmiast wyświetl błąd
+                    Console.WriteLine("Połączono z RabbitMQ");
 
-                    // Obsługa wiadomości
-                    if (message == "checkCart")
+                    try
                     {
-                        // Przygotowanie odpowiedzi
-                        var response = string.Join(";", shoppingService.GetCart());
-                        var responseBody = Encoding.UTF8.GetBytes(response);
+                        // Deklaracja kolejki komend
+                        channel.QueueDeclare(queue: "commandQueue",
+                                             durable: false,
+                                             exclusive: false,
+                                             autoDelete: false,
+                                             arguments: null);
 
-                        // Wysłanie odpowiedzi do responseQueue
-                        channel.BasicPublish(exchange: "",
-                                             routingKey: "responseQueue",
-                                             basicProperties: null,
-                                             body: responseBody);
+                        // Deklaracja kolejki odpowiedzi
+                        channel.QueueDeclare(queue: "responseQueue",
+                                             durable: false,
+                                             exclusive: false,
+                                             autoDelete: false,
+                                             arguments: null);
 
-                        Console.WriteLine("Wysłano odpowiedź z listą zakupów");
+                        var consumer = new EventingBasicConsumer(channel);
+                        consumer.Received += (model, ea) =>
+                        {
+                            var body = ea.Body.ToArray();
+                            var message = Encoding.UTF8.GetString(body);
+
+                            // Obsługa wiadomości
+                            if (message == "checkCart")
+                            {
+                                // Przygotowanie odpowiedzi
+                                var response = string.Join(";", shoppingService.GetCart());
+                                var responseBody = Encoding.UTF8.GetBytes(response);
+
+                                // Wysłanie odpowiedzi do responseQueue
+                                channel.BasicPublish(exchange: "",
+                                                     routingKey: "responseQueue",
+                                                     basicProperties: null,
+                                                     body: responseBody);
+
+                                Console.WriteLine("Wysłano odpowiedź z listą zakupów");
+                            }
+                            else if (message == "sendAllProducts")
+                            {
+                                ForwardToCourierService();
+                            }
+                            else
+                            {
+                                // Dodanie nowej wiadomości
+                                shoppingService.AddToCart(message);
+                                Console.WriteLine("Dodano: {0}", message);
+                            }
+                        };
+
+                        channel.BasicConsume(queue: "commandQueue",
+                                             autoAck: true,
+                                             consumer: consumer);
+
+                        Console.WriteLine("BackendApp nasłuchuje na wiadomości...");
+                        Console.ReadLine();
                     }
-                    else if (message == "sendAllProducts")
+                    catch (Exception ex)
                     {
-                        ForwardToCourierService();
+                        // Fail-fast: Jeśli nie uda się stworzyć kolejki lub obsłużyć wiadomości, rzuć błąd
+                        Console.WriteLine("Błąd podczas tworzenia lub używania kolejki: " + ex.Message);
+                        throw;
                     }
-                    else
-                    {
-                        // Dodanie nowej wiadomości
-                        shoppingService.AddToCart(message);
-                        Console.WriteLine("Dodano: {0}", message);
-                    }
-                };
-
-                channel.BasicConsume(queue: "commandQueue",
-                                     autoAck: true,
-                                     consumer: consumer);
-
-                Console.WriteLine("BackendApp nasłuchuje na wiadomości...");
-                Console.ReadLine();
+                }
             }
-
+            catch (Exception ex)
+            {
+                // Fail-fast: Błąd przy połączeniu z RabbitMQ
+                Console.WriteLine("Nie udało się połączyć z RabbitMQ: " + ex.Message);
+                throw;
+            }
         }
 
         // Przesyłanie wiadomości do serwisu kurierskiego
         private static void ForwardToCourierService()
         {
             var factory = new ConnectionFactory() { HostName = Environment.GetEnvironmentVariable("RABBITMQ_HOST") ?? "localhost" };
-
-            using (var connection = factory.CreateConnection())
-            using (var channel = connection.CreateModel())
+            try
             {
-                // Deklaracja kolejki kurierskiej
-                channel.QueueDeclare(queue: "courierQueue",
-                                     durable: false,
-                                     exclusive: false,
-                                     autoDelete: false,
-                                     arguments: null);
+                using (var connection = factory.CreateConnection())
+                using (var channel = connection.CreateModel())
+                {
+                    // Deklaracja kolejki kurierskiej
+                    channel.QueueDeclare(queue: "courierQueue",
+                                         durable: false,
+                                         exclusive: false,
+                                         autoDelete: false,
+                                         arguments: null);
 
-                var messages = shoppingService.GetCart();
-                var allProducts = string.Join(";", messages);
+                    var messages = shoppingService.GetCart();
+                    var allProducts = string.Join(";", messages);
 
-                var body = Encoding.UTF8.GetBytes(allProducts);
+                    var body = Encoding.UTF8.GetBytes(allProducts);
 
-                // Wysłanie wszystkich produktów do serwisu kurierskiego
-                channel.BasicPublish(exchange: "",
-                                     routingKey: "courierQueue",
-                                     basicProperties: null,
-                                     body: body);
+                    // Wysłanie wszystkich produktów do serwisu kurierskiego
+                    channel.BasicPublish(exchange: "",
+                                         routingKey: "courierQueue",
+                                         basicProperties: null,
+                                         body: body);
 
-                Console.WriteLine("Wysłano produkty do serwisu kurierskiego.");
+                    Console.WriteLine("Wysłano produkty do serwisu kurierskiego.");
 
-                // Wyczyszczenie listy wiadomości po wysłaniu produktów
-                shoppingService.ClearCart();
+                    // Wyczyszczenie listy wiadomości po wysłaniu produktów
+                    shoppingService.ClearCart();
+                }
+            }
+            catch (Exception ex)
+            {
+                // Fail-fast: Błąd przy wysyłaniu wiadomości do serwisu kurierskiego
+                Console.WriteLine("Błąd przy wysyłaniu produktów do serwisu kurierskiego: " + ex.Message);
+                throw;
             }
         }
 
