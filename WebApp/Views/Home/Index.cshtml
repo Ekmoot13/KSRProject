@@ -1,0 +1,52 @@
+﻿@{
+    ViewBag.Title = "Sklep";
+}
+
+<h2>Dodaj produkty do koszyka</h2>
+
+<!-- Formularz do wpisania wiadomości -->
+@using (Html.BeginForm("SendProduct", "Home", FormMethod.Post))
+{
+    <label for="product">Co chcesz kupić:</label>
+    <input type="text" name="product" id="product" required />
+
+    <button type="submit">Wyślij</button>
+}
+
+<!-- Informacja zwrotna dla użytkownika -->
+@if (ViewBag.Message != null)
+{
+    <p>@ViewBag.Message</p>
+}
+
+<h2>Sprawdź, co wysłałeś</h2>
+
+<!-- Formularz do sprawdzania wysłanych wiadomości -->
+@using (Html.BeginForm("CheckCart", "Home", FormMethod.Post))
+{
+    <button type="submit">Sprawdź, co masz w koszyku</button>
+}
+
+<!-- Miejsce na wyświetlanie wysłanych wiadomości -->
+@if (ViewBag.SentCart != null && ViewBag.SentCart.Length > 0)
+{
+    <h3>Twoje produkty:</h3>
+    <ul>
+        @foreach (var product in ViewBag.SentCart)
+        {
+            <li>@product</li>
+        }
+    </ul>
+}
+else if (ViewBag.SentMessages != null)
+{
+    <p>Nie ma żadnych wysłanych wiadomości.</p>
+}
+
+<h2>Wysyłanie wszystkich produktów</h2>
+
+<!-- Formularz do wysłania komendy wysyłki produktów -->
+@using (Html.BeginForm("SendAllProducts", "Home", FormMethod.Post))
+{
+    <button type="submit">Wyślij wszystkie produkty do serwisu kurierskiego</button>
+}

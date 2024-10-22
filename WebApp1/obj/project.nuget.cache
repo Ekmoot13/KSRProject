@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "mQH5kf9ccFAvOxmbWP4LhhcH2yNbglZOoU0z4GDYTNvYzDzKc+Lj9LCWrmhpxYsWndxB4g/Dq+5SAO3QUqfcKA==",
+  "success": true,
+  "projectFilePath": "C:\\Users\\toomm\\Downloads\\Shop\\WebApp\\WebApp.fsproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\toomm\\.nuget\\packages\\fsharp.core\\8.0.200\\fsharp.core.8.0.200.nupkg.sha512"
+  ],
+  "logs": []
+}

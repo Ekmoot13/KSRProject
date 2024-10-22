@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  rabbitmq:
+    image: "rabbitmq:management"
+    container_name: "rabbitmq"
+    ports:
+      - "5672:5672"   # Port RabbitMQ (używany przez aplikacje)
+      - "15672:15672" # Port panelu zarządzania RabbitMQ
+    environment:
+      RABBITMQ_DEFAULT_USER: user
+      RABBITMQ_DEFAULT_PASS: password
+
+  backendapp:
+    build:
+      context: ./BackendApp  # Ścieżka do Dockerfile w projekcie BackendApp
+    container_name: "backendapp"
+    depends_on:
+      - rabbitmq
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+    networks:
+      - app-network
+
+  courierapp:
+    build:
+      context: ./CourierApp  # Ścieżka do Dockerfile w projekcie CourierApp
+    container_name: "courierapp"
+    depends_on:
+      - rabbitmq
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
